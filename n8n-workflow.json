@@ -3,11 +3,28 @@
   "active": false,
   "nodes": [
     {
-      "id": "telegram-trigger",
-      "name": "Telegram Trigger",
-      "type": "n8n-nodes-base.telegramTrigger",
-      "typeVersion": 1.3,
+      "id": "cron-trigger",
+      "name": "Check Every 10s",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
       "position": [240, 300],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "poll-telegram",
+      "name": "Poll Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
       "credentials": {
         "telegramApi": {
           "id": "1",
@@ -15,29 +32,35 @@
         }
       },
       "parameters": {
-        "updates": ["message"],
-        "additionalFields": {}
+        "method": "GET",
+        "url": "={{ 'https://api.telegram.org/bot' + $credentials.telegramApi.accessToken + '/getUpdates?timeout=5&offset=' + ($workflow.staticData.lastUpdateId || 0) }}",
+        "authentication": "none",
+        "sendBody": false,
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "process-messages",
+      "name": "Process Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst messages = response.result || [];\n\nif (messages.length === 0) {\n  // No new messages, stop the workflow\n  return [];\n}\n\n// Save the last update ID so we don't reprocess\nconst lastId = messages[messages.length - 1].update_id;\n$workflow.staticData.lastUpdateId = lastId + 1;\n\n// Process only messages that have text\nconst results = [];\nfor (const update of messages) {\n  const msg = update.message;\n  if (msg && msg.text) {\n    results.push({\n      json: {\n        chatId: msg.chat.id,\n        messageText: msg.text,\n        raw: update\n      }\n    });\n  }\n}\n\nreturn results;"
       }
     },
     {
       "id": "gemini-api",
-      "name": "Gemini API",
+      "name": "Call Gemini",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300],
+      "position": [860, 300],
       "parameters": {
         "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyCiNxSW2ite5jlNnT-0Gi-4eOsmqZQ_gTg",
         "authentication": "none",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "key",
-              "value": "={{ $env.GEMINI_API_KEY }}"
-            }
-          ]
-        },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -57,7 +80,7 @@
             },
             {
               "name": "contents[0].parts[0].text",
-              "value": "={{ $json.message.text }}"
+              "value": "={{ $json.messageText }}"
             },
             {
               "name": "generationConfig.temperature",
@@ -83,9 +106,9 @@
       "name": "Parse Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 300],
+      "position": [1040, 300],
       "parameters": {
-        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const geminiResponse = item.json;\n\n  // Get the original chat data from the trigger\n  const chatId = $node['Telegram Trigger'].json.message.chat.id;\n  const originalText = $node['Telegram Trigger'].json.message.text;\n  const timestamp = new Date().toISOString();\n\n  // Extract Gemini's JSON response text\n  let parsed;\n  try {\n    const rawText = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '{}';\n    parsed = JSON.parse(rawText);\n  } catch (e) {\n    parsed = {\n      qualified: false,\n      reasoning: 'Error parsing the qualification response.'\n    };\n  }\n\n  const qualified = parsed.qualified === true;\n  const reasoning = parsed.reasoning || 'No reasoning provided.';\n  const header = qualified ? 'Qualified' : 'Not Qualified';\n  const replyText = `*${header}*\\n\\n${reasoning}`;\n\n  return {\n    json: {\n      chatId: chatId,\n      replyText: replyText,\n      decision: header,\n      reason: reasoning,\n      originalText: originalText,\n      timestamp: timestamp\n    }\n  };\n});"
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const geminiResponse = item.json;\n  const chatId = item.json._chatId || $node['Process Messages'].json.chatId;\n  const originalText = item.json._originalText || $node['Process Messages'].json.messageText;\n  const timestamp = new Date().toISOString();\n\n  let parsed;\n  try {\n    const rawText = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '{}';\n    parsed = JSON.parse(rawText);\n  } catch (e) {\n    parsed = {\n      qualified: false,\n      reasoning: 'Error parsing the qualification response.'\n    };\n  }\n\n  const qualified = parsed.qualified === true;\n  const reasoning = parsed.reasoning || 'No reasoning provided.';\n  const header = qualified ? 'Qualified' : 'Not Qualified';\n  const replyText = `*${header}*\\n\\n${reasoning}`;\n\n  return {\n    json: {\n      chatId: chatId,\n      replyText: replyText,\n      decision: header,\n      reason: reasoning,\n      originalText: originalText,\n      timestamp: timestamp\n    }\n  };\n});"
       }
     },
     {
@@ -93,7 +116,7 @@
       "name": "Telegram Reply",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [960, 200],
+      "position": [1220, 200],
       "credentials": {
         "telegramApi": {
           "id": "1",
@@ -115,7 +138,7 @@
       "name": "Google Sheets Log",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [960, 440],
+      "position": [1220, 440],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "2",
@@ -149,18 +172,40 @@
     }
   ],
   "connections": {
-    "Telegram Trigger": {
+    "Check Every 10s": {
       "main": [
         [
           {
-            "node": "Gemini API",
+            "node": "Poll Telegram",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Gemini API": {
+    "Poll Telegram": {
+      "main": [
+        [
+          {
+            "node": "Process Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Messages": {
+      "main": [
+        [
+          {
+            "node": "Call Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Gemini": {
       "main": [
         [
           {
