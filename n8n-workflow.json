@@ -51,7 +51,7 @@
             },
             {
               "name": "Authorization",
-              "value": "Bearer YOUR_GROQ_API_KEY"
+              "value": "Bearer YOUR_GROQ_KEY"
             }
           ]
         },
@@ -59,26 +59,7 @@
         "genericAuthType": "httpQueryAuth",
         "sendBody": true,
         "bodyContentType": "json",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "model",
-              "value": "llama-3.1-70b-versatile"
-            },
-            {
-              "name": "messages",
-              "value": "[{\"role\": \"system\", \"content\": \"Eres un asistente de calificacion de leads para una empresa B2B de automatizacion e IA. Evalua si el lead cumple con este ICP:\\n1) Tipo de empresa: servicios o consultoria (NO productos, e-commerce, manufactura)\\n2) Minimo 5 empleados\\n3) Ubicacion: Espana o Latinoamerica\\n4) Interes: automatizacion, IA o transformacion digital\\n\\nResponde UNICAMENTE con JSON puro. Formato: {\\\"qualified\\\": true|false, \\\"reasoning\\\": \\\"explicacion en espanol\\\"}\"}, {\"role\": \"user\", \"content\": \"{{ $json.message.text }}\"}]"
-            },
-            {
-              "name": "temperature",
-              "value": 0.3
-            },
-            {
-              "name": "max_tokens",
-              "value": 500
-            }
-          ]
-        },
+        "body": "={\n  \"model\": \"llama-3.1-70b-versatile\",\n  \"messages\": [\n    {\"role\": \"system\", \"content\": \"Eres un asistente de calificacion de leads para una empresa B2B de automatizacion e IA. Evalua si el lead cumple con este ICP:\\n1) Tipo de empresa: servicios o consultoria (NO productos, e-commerce, manufactura)\\n2) Minimo 5 empleados\\n3) Ubicacion: Espana o Latinoamerica\\n4) Interes: automatizacion, IA o transformacion digital\\n\\nResponde UNICAMENTE con JSON puro. Formato: {\\\"qualified\\\": true|false, \\\"reasoning\\\": \\\"explicacion en espanol\\\"}\"},\n    {\"role\": \"user\", \"content\": \"{{ $json.message.text }}\"}\n  ],\n  \"temperature\": 0.3,\n  \"max_tokens\": 500\n}",
         "options": {
           "timeout": 30000
         }
