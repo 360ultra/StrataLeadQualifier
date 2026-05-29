@@ -25,10 +25,17 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [480, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "1",
+          "name": "Telegram Bot Token"
+        }
+      },
       "parameters": {
         "method": "GET",
-        "url": "=https://api.telegram.org/bot8602988291:AAGoJf_tUG0ooAo-CKLak7dcYIKTzlG6QXI/getUpdates?timeout=5&offset={{ $workflow.staticData.lastUpdateId || 0 }}",
-        "authentication": "none",
+        "url": "=https://api.telegram.org/bot{{ $credentials['Telegram Bot Token'].token }}/getUpdates?timeout=5&offset={{ $workflow.staticData.lastUpdateId || 0 }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
         "sendBody": false,
         "options": {
           "timeout": 15000
@@ -42,7 +49,7 @@
       "typeVersion": 2,
       "position": [680, 300],
       "parameters": {
-        "jsCode": "const response = $input.first().json;\nconst messages = response.result || [];\n\nif (messages.length === 0) {\n  // No new messages, stop the workflow\n  return [];\n}\n\n// Save the last update ID so we don't reprocess\nconst lastId = messages[messages.length - 1].update_id;\n$workflow.staticData.lastUpdateId = lastId + 1;\n\n// Process only messages that have text\nconst results = [];\nfor (const update of messages) {\n  const msg = update.message;\n  if (msg && msg.text) {\n    results.push({\n      json: {\n        chatId: msg.chat.id,\n        messageText: msg.text,\n        raw: update\n      }\n    });\n  }\n}\n\nreturn results;"
+        "jsCode": "const response = $input.first().json;\nconst messages = response.result || [];\n\nif (messages.length === 0) {\n  return [];\n}\n\nconst lastId = messages[messages.length - 1].update_id;\n$workflow.staticData.lastUpdateId = lastId + 1;\n\nconst results = [];\nfor (const update of messages) {\n  const msg = update.message;\n  if (msg && msg.text) {\n    results.push({\n      json: {\n        chatId: msg.chat.id,\n        messageText: msg.text,\n        raw: update\n      }\n    });\n  }\n}\n\nreturn results;"
       }
     },
     {
@@ -51,10 +58,17 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [860, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "2",
+          "name": "Gemini API Key"
+        }
+      },
       "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyCiNxSW2ite5jlNnT-0Gi-4eOsmqZQ_gTg",
-        "authentication": "none",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -102,7 +116,7 @@
       "typeVersion": 2,
       "position": [1040, 300],
       "parameters": {
-        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const geminiResponse = item.json;\n  const chatId = item.json._chatId || $node['Process Messages'].json.chatId;\n  const originalText = item.json._originalText || $node['Process Messages'].json.messageText;\n  const timestamp = new Date().toISOString();\n\n  let parsed;\n  try {\n    const rawText = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '{}';\n    parsed = JSON.parse(rawText);\n  } catch (e) {\n    parsed = {\n      qualified: false,\n      reasoning: 'Error parsing the qualification response.'\n    };\n  }\n\n  const qualified = parsed.qualified === true;\n  const reasoning = parsed.reasoning || 'No reasoning provided.';\n  const header = qualified ? 'Qualified' : 'Not Qualified';\n  const replyText = `*${header}*\\n\\n${reasoning}`;\n\n  return {\n    json: {\n      chatId: chatId,\n      replyText: replyText,\n      decision: header,\n      reason: reasoning,\n      originalText: originalText,\n      timestamp: timestamp\n    }\n  };\n});"
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const geminiResponse = item.json;\n  const chatId = $node['Process Messages'].json.chatId;\n  const originalText = $node['Process Messages'].json.messageText;\n  const timestamp = new Date().toISOString();\n\n  let parsed;\n  try {\n    const rawText = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '{}';\n    parsed = JSON.parse(rawText);\n  } catch (e) {\n    parsed = {\n      qualified: false,\n      reasoning: 'Error parsing the qualification response.'\n    };\n  }\n\n  const qualified = parsed.qualified === true;\n  const reasoning = parsed.reasoning || 'No reasoning provided.';\n  const header = qualified ? 'Qualified' : 'Not Qualified';\n  const replyText = `*${header}*\\n\\n${reasoning}`;\n\n  return {\n    json: {\n      chatId: chatId,\n      replyText: replyText,\n      decision: header,\n      reason: reasoning,\n      originalText: originalText,\n      timestamp: timestamp\n    }\n  };\n});"
       }
     },
     {
@@ -113,7 +127,7 @@
       "position": [1220, 200],
       "credentials": {
         "telegramApi": {
-          "id": "1",
+          "id": "3",
           "name": "Telegram Bot"
         }
       },
@@ -135,7 +149,7 @@
       "position": [1220, 440],
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "2",
+          "id": "4",
           "name": "Google Sheets Account"
         }
       },
