@@ -25,15 +25,9 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [480, 300],
-      "credentials": {
-        "telegramApi": {
-          "id": "1",
-          "name": "Telegram Bot"
-        }
-      },
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_TOKEN + '/getUpdates?timeout=5&offset=' + ($workflow.staticData.lastUpdateId || 0) }}",
+        "url": "=https://api.telegram.org/bot8602988291:AAGoJf_tUG0ooAo-CKLak7dcYIKTzlG6QXI/getUpdates?timeout=5&offset={{ $workflow.staticData.lastUpdateId || 0 }}",
         "authentication": "none",
         "sendBody": false,
         "options": {
