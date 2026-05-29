@@ -33,7 +33,7 @@
       },
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.telegram.org/bot' + $credentials.telegramApi.accessToken + '/getUpdates?timeout=5&offset=' + ($workflow.staticData.lastUpdateId || 0) }}",
+        "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_TOKEN + '/getUpdates?timeout=5&offset=' + ($workflow.staticData.lastUpdateId || 0) }}",
         "authentication": "none",
         "sendBody": false,
         "options": {
