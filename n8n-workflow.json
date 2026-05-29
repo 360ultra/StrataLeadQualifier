@@ -68,10 +68,6 @@
             {
               "name": "generationConfig.responseMimeType",
               "value": "application/json"
-            },
-            {
-              "name": "generationConfig.thinkingConfig.thinking_level",
-              "value": "limited"
             }
           ]
         },
