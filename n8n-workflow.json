@@ -25,8 +25,8 @@
       }
     },
     {
-      "id": "gemini-api",
-      "name": "Call Gemini",
+      "id": "groq-api",
+      "name": "Call Groq",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -36,18 +36,22 @@
       "credentials": {
         "httpQueryAuth": {
           "id": "2",
-          "name": "Gemini API Key"
+          "name": "Groq API Key"
         }
       },
       "parameters": {
         "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Content-Type",
               "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY"
             }
           ]
         },
@@ -58,20 +62,20 @@
         "bodyParameters": {
           "parameters": [
             {
-              "name": "system_instruction.parts[0].text",
-              "value": "Eres un asistente de calificacion de leads para una empresa B2B de automatizacion e IA. Evalua si el lead cumple con este ICP:\\n1) Tipo de empresa: servicios o consultoria (NO productos, e-commerce, manufactura)\\n2) Minimo 5 empleados\\n3) Ubicacion: Espana o Latinoamerica\\n4) Interes: automatizacion, IA o transformacion digital\\n\\nResponde UNICAMENTE con JSON puro sin markdown. Formato:\\n{\"qualified\": true, \"reasoning\": \"explicacion\"}"
+              "name": "model",
+              "value": "llama-3.1-70b-versatile"
             },
             {
-              "name": "contents[0].parts[0].text",
-              "value": "={{ $json.message.text }}"
+              "name": "messages",
+              "value": "[{\"role\": \"system\", \"content\": \"Eres un asistente de calificacion de leads para una empresa B2B de automatizacion e IA. Evalua si el lead cumple con este ICP:\\n1) Tipo de empresa: servicios o consultoria (NO productos, e-commerce, manufactura)\\n2) Minimo 5 empleados\\n3) Ubicacion: Espana o Latinoamerica\\n4) Interes: automatizacion, IA o transformacion digital\\n\\nResponde UNICAMENTE con JSON puro. Formato: {\\\"qualified\\\": true|false, \\\"reasoning\\\": \\\"explicacion en espanol\\\"}\"}, {\"role\": \"user\", \"content\": \"{{ $json.message.text }}\"}]"
             },
             {
-              "name": "generationConfig.temperature",
+              "name": "temperature",
               "value": 0.3
             },
             {
-              "name": "generationConfig.maxOutputTokens",
-              "value": 1000
+              "name": "max_tokens",
+              "value": 500
             }
           ]
         },
@@ -90,7 +94,7 @@
         300
       ],
       "parameters": {
-        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const r = item.json;\n  const msg = $node['Telegram Trigger'].json.message;\n  const chatId = msg.chat.id;\n  const originalText = msg.text;\n  const ts = new Date().toISOString();\n\n  let parsed = null;\n  let rawText = '';\n\n  try {\n    const candidates = r.candidates || r.error || [];\n    const firstCandidate = candidates[0] || {};\n    const content = firstCandidate.content || {};\n    const parts = content.parts || [];\n\n    if (content.text) {\n      rawText = content.text;\n    } else if (parts.length > 0) {\n      rawText = parts.map(p => p.text || '').join('');\n    } else if (r.text) {\n      rawText = r.text;\n    } else {\n      rawText = JSON.stringify(r);\n    }\n\n    rawText = rawText.trim();\n\n    if (!rawText) { throw new Error('No text in response'); }\n\n    // Find first opening brace\n    const firstBrace = rawText.indexOf('{');\n    if (firstBrace === -1) {\n      throw new Error('No JSON found. Raw: ' + rawText.substring(0, 100));\n    }\n\n    // Try to find a proper closing brace - the one that closes the top-level object\n    // Start from end, find the first } that when paired with { gives valid JSON\n    let endPos = rawText.length - 1;\n    let openCount = 0;\n    let closePos = -1;\n\n    for (let i = firstBrace; i < rawText.length; i++) {\n      if (rawText[i] === '{') openCount++;\n      if (rawText[i] === '}') {\n        openCount--;\n        if (openCount === 0) {\n          closePos = i;\n          break;\n        }\n      }\n    }\n\n    if (closePos === -1) {\n      throw new Error('Unclosed JSON. Raw: ' + rawText.substring(0, 150));\n    }\n\n    let candidate = rawText.substring(firstBrace, closePos + 1);\n\n    try {\n      parsed = JSON.parse(candidate);\n    } catch (e1) {\n      let cleaned = candidate.replace(/,\\s*([\\]}])/g, '$1');\n      try { parsed = JSON.parse(cleaned); }\n      catch (e2) {\n        let attempt = candidate.replace(/([\\]}])/g, '');\n        if (attempt.includes('\"qualified\"')) {\n          let qMatch = attempt.match(/\"qualified\"\\s*:\\s*(true|false)/);\n          let rMatch = attempt.match(/\"reasoning\"\\s*:\\s*\"([^\"]*)/);\n          if (qMatch) { parsed = { qualified: qMatch[1] === 'true', reasoning: rMatch ? rMatch[1] : 'Sin razonamiento' }; }\n        }\n        if (!parsed) throw new Error('JSON parsing failed');\n      }\n    }\n  } catch (e) {\n    parsed = { qualified: false, reasoning: 'Error: ' + e.message.substring(0, 80) };\n  }\n\n  const qualified = parsed && parsed.qualified === true;\n  const reasoning = (parsed && parsed.reasoning) ? parsed.reasoning : 'Sin razonamiento.';\n  const h = qualified ? '[CALIFICADO]' : '[NO CALIFICADO]';\n\n  return { json: { chatId, replyText: h + '\\n\\n' + reasoning, decision: h, reason: reasoning, originalText, timestamp: ts, _debug: rawText.substring(0, 300) } };\n});"
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const r = item.json;\n  const msg = $node['Telegram Trigger'].json.message;\n  const chatId = msg.chat.id;\n  const originalText = msg.text;\n  const ts = new Date().toISOString();\n\n  let parsed = null;\n  let rawText = '';\n\n  try {\n    const choices = r.choices || [];\n    if (choices.length > 0 && choices[0].message) {\n      rawText = choices[0].message.content || '';\n    } else if (choices.length > 0 && choices[0].text) {\n      rawText = choices[0].text || '';\n    } else {\n      rawText = JSON.stringify(r);\n    }\n\n    rawText = rawText.trim();\n\n    if (!rawText) { throw new Error('No text in response'); }\n\n    let cleanRaw = rawText;\n    if (cleanRaw.startsWith('```json')) cleanRaw = cleanRaw.slice(7);\n    else if (cleanRaw.startsWith('```')) cleanRaw = cleanRaw.slice(3);\n    if (cleanRaw.endsWith('```')) cleanRaw = cleanRaw.slice(0, -3);\n    cleanRaw = cleanRaw.trim();\n\n    const first = cleanRaw.indexOf('{');\n    if (first === -1) {\n      throw new Error('No JSON found. Raw: ' + rawText.substring(0, 100));\n    }\n\n    let openCount = 0;\n    let closePos = -1;\n    for (let i = first; i < cleanRaw.length; i++) {\n      if (cleanRaw[i] === '{') openCount++;\n      if (cleanRaw[i] === '}') {\n        openCount--;\n        if (openCount === 0) {\n          closePos = i;\n          break;\n        }\n      }\n    }\n\n    if (closePos === -1) {\n      throw new Error('Unclosed JSON');\n    }\n\n    let candidate = cleanRaw.substring(first, closePos + 1);\n\n    try {\n      parsed = JSON.parse(candidate);\n    } catch (e1) {\n      let cleaned = candidate.replace(/,\\s*([\\]}])/g, '$1');\n      try { parsed = JSON.parse(cleaned); }\n      catch (e2) {\n        let attempt = cleaned.replace(/([\\]}])/g, '');\n        if (attempt.includes('\"qualified\"')) {\n          let qMatch = attempt.match(/\"qualified\"\\s*:\\s*(true|false)/);\n          let rMatch = attempt.match(/\"reasoning\"\\s*:\\s*\"([^\"]*)/);\n          if (qMatch) { parsed = { qualified: qMatch[1] === 'true', reasoning: rMatch ? rMatch[1] : 'Sin razonamiento' }; }\n        }\n        if (!parsed) throw new Error('JSON parsing failed');\n      }\n    }\n  } catch (e) {\n    parsed = { qualified: false, reasoning: 'Error: ' + e.message.substring(0, 80) };\n  }\n\n  const qualified = parsed && parsed.qualified === true;\n  const reasoning = (parsed && parsed.reasoning) ? parsed.reasoning : 'Sin razonamiento.';\n  const h = qualified ? '[CALIFICADO]' : '[NO CALIFICADO]';\n\n  return { json: { chatId, replyText: h + '\\n\\n' + reasoning, decision: h, reason: reasoning, originalText, timestamp: ts, _debug: rawText.substring(0, 300) } };\n});"
       }
     },
     {
@@ -162,14 +166,14 @@
       "main": [
         [
           {
-            "node": "Call Gemini",
+            "node": "Call Groq",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Call Gemini": {
+    "Call Groq": {
       "main": [
         [
           {
