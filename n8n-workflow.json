@@ -64,10 +64,6 @@
             {
               "name": "generationConfig.maxOutputTokens",
               "value": "={{ 500 }}"
-            },
-            {
-              "name": "generationConfig.thinkingBudget",
-              "value": "={{ 0 }}"
             }
           ]
         },
