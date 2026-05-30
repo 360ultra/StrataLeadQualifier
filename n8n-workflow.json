@@ -33,6 +33,12 @@
         480,
         300
       ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "groqKey",
+          "name": "Groq API Key"
+        }
+      },
       "parameters": {
         "method": "POST",
         "url": "https://api.groq.com/openai/v1/chat/completions",
@@ -45,10 +51,12 @@
             },
             {
               "name": "Authorization",
-              "value": "Bearer YOUR_GROQ_API_KEY"
+              "value": "Bearer YOUR_GROQ_KEY"
             }
           ]
         },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
         "sendBody": true,
         "bodyContentType": "json",
         "bodyParameters": {
@@ -120,6 +128,45 @@
         "text": "={{ $json.replyText }}",
         "additionalFields": {}
       }
+    },
+    {
+      "id": "google-sheets-log",
+      "name": "Google Sheets Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        960,
+        440
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "googleSheets",
+          "name": "Google Sheets Account"
+        }
+      },
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "StrataBoldLeadQualifier",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "A": "={{ $json.timestamp }}",
+            "B": "={{ $json.originalText }}",
+            "C": "={{ $json.decision }}",
+            "D": "={{ $json.reason }}"
+          }
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -150,6 +197,11 @@
         [
           {
             "node": "Telegram Reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets Log",
             "type": "main",
             "index": 0
           }
