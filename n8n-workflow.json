@@ -126,9 +126,7 @@
         "operation": "sendMessage",
         "chatId": "={{ $json.chatId }}",
         "text": "={{ $json.replyText }}",
-        "additionalFields": {
-          "parseMode": "HTML"
-        }
+        "additionalFields": {}
       }
     },
     {
