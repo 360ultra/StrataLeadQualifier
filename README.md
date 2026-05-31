@@ -1,7 +1,8 @@
 # Lead Qualification Agent — n8n Workflow
 
-Telegram bot that qualifies B2B leads against an ICP using **Google Gemini** (free).
-No webhook, no HTTPS needed — uses polling (bot responds within 10 seconds).
+Telegram bot that qualifies B2B leads against an ICP using **Groq API** (free, fast, llama-3.3-70b).
+
+Webhook-based — responds instantly. No polling needed.
 
 ## Deliverable: `n8n-workflow.json`
 
@@ -9,83 +10,112 @@ Import this file into any n8n instance.
 
 ---
 
-## Quick Start (3 steps)
+## Quick Start
 
 ### 1. Get your free keys
 
 | Key | Where to get |
 |-----|-------------|
 | **Telegram Bot Token** | Open [@BotFather](https://t.me/BotFather) → `/newbot` → name it → copy token |
-| **Gemini API Key** | https://aistudio.google.com/apikey → **Create API Key** (no credit card) |
+| **Groq API Key** | https://console.groq.com → API Keys → **Create API Key** (free, no credit card) |
 
 ### 2. Import the workflow
 
-Import `n8n-workflow.json` into n8n. You'll see 6 nodes with red badges.
+Import `n8n-workflow.json` into n8n. You'll see 5 nodes.
 
-### 3. Create these 3 credentials
+### 3. Create these credentials
 
-Click each node's credential dropdown → **Create New** → fill:
+#### Groq API Key
+- Type: **HTTP Query Auth**
+- Name: `Groq API Key`
+- Auth Type: **Query Auth**
+- Key: `Authorization`
+- Value: `Bearer gsk_YOUR_GROQ_KEY`
 
-#### Credential A: `Telegram Bot Token`
-| Field | Value |
-|-------|-------|
-| Type | **Query Auth** |
-| Name | `Telegram Bot Token` |
-| Parameter Name | `token` |
-| Parameter Value | *paste your Telegram bot token* |
+#### Telegram Bot (trigger + reply nodes)
+- Type: **Telegram Bot API**
+- Name: `Telegram Bot`
+- Access Token: *your Telegram bot token*
 
-#### Credential B: `Gemini API Key`
-| Field | Value |
-|-------|-------|
-| Type | **Query Auth** |
-| Name | `Gemini API Key` |
-| Parameter Name | `key` |
-| Parameter Value | *paste your Gemini API key* |
+#### Google Sheets (optional)
+- Type: **Google Sheets OAuth2 API**
+- Auth Method: **Service Account**
+- Upload your service account JSON file
 
-#### Credential C: `Telegram Bot`
-| Field | Value |
-|-------|-------|
-| Type | **Telegram Bot API** |
-| Name | `Telegram Bot` |
-| Access Token | *paste your Telegram bot token* |
+### 4. Configure Google Sheets Log node
 
-**Done.** Click **Active** → **Save**. Send a message to your bot on Telegram — it replies within 10 seconds.
+Set `documentId` to your spreadsheet ID (from the Google Sheets URL).
+
+**Done.** Activate the workflow. Send a message to your Telegram bot.
 
 ---
 
-## How It Works
+## What It Does
 
 ```
-Every 10s → Poll Telegram → New message? → Call Gemini → Parse → Reply + Log
+Telegram message → Groq (llama-3.3-70b) → Parse JSON → Telegram reply + Google Sheets log
 ```
 
-**ICP criteria evaluated by Gemini:**
-1. Company type: services or consulting
+### ICP Criteria
+1. Company type: services or consulting (NOT products, e-commerce, manufacturing)
 2. Minimum 5 employees
 3. Location: Spain or Latin America
 4. Interest: automation, AI, or digital transformation
 
+### Bot Response
+```
+✅ CALIFICADO
+
+La empresa cumple con el ICP ya que...
+```
+
+OR
+
+```
+❌ NO CALIFICADO
+
+La empresa no cumple con el ICP porque...
+```
+
+### Google Sheets Log
+| A (Timestamp) | B (Original Text) | C (Decision) | D (Reasoning) |
+|--------------|-------------------|--------------|----------------|
+
+Timestamp format: `DD/MM/YYYY HH:mm:ss`
+
 ---
 
-## Google Sheets Logging (optional)
+## Workflow Nodes
 
-Without this, the bot still works — it just logs to n8n execution history.
-
-1. https://console.cloud.google.com → **New Project**
-2. Enable **Google Sheets API** + **Google Drive API**
-3. **Credentials** → **Create Service Account** → download JSON
-4. Create a Google Sheet → **Share** with the service account email (Editor)
-5. Copy the **Spreadsheet ID** from the URL
-6. In n8n → **Credentials** → **Google Sheets OAuth2 API** → **Service Account** → upload JSON
-7. Open workflow → **Google Sheets Log** node → set `documentId` to your sheet ID → select credential
+1. **Telegram Trigger** — receives incoming messages
+2. **Call Groq** — calls Groq API with system prompt + user message
+3. **Parse Response** — extracts qualified/reasoning from JSON response
+4. **Telegram Reply** — sends formatted reply to user
+5. **Google Sheets Log** — appends row to spreadsheet
 
 ---
 
-## Risk Mitigation
+## Setup Details
 
-1. **Error handling** — Code node wraps Gemini parsing in try/catch. n8n auto-retries on failure. Bot always replies with a fallback message instead of crashing.
+### Groq Model
+- `llama-3.3-70b-versatile`
+- Temperature: 0.3
+- Max tokens: 500
+- System prompt in Spanish, response in Spanish JSON
 
-2. **Prompt injection** — System instruction forces Gemini to ignore user-embedded override attempts. `responseMimeType: application/json` constrains output to structured data, reducing injection surface.
+### Telegram
+- Parse mode: plain text (emoji included)
+- Webhook mode (not polling)
 
-3. **API costs** — Gemini free tier: 60 requests/min, 1M tokens, $0. No billing config needed. No surprise charges at any volume.
+### Google Sheets
+- Service Account credential required
+- Sheet name: `StrataBoldLeadQualifier`
+- Appends: timestamp, original text, decision, reasoning
 
+---
+
+## Error Handling
+
+- JSON parsing wrapped in try/catch with fallback
+- n8n auto-retries on Groq/API failure
+- Bot always replies even if parsing fails
